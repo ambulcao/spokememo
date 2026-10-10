@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-label="SpokeMemo">
+  <rect width="80" height="80" rx="22" fill="#0B3A75"/>
+  <path d="M44 18.5c2.4-2.6 5.2-2.6 7.6 0" fill="none" stroke="#7DD3FC" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M41 14.2c4.2-4.4 9.6-4.4 13.8 0" fill="none" stroke="#7DD3FC" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M32 23 C19 21 13 29 19 34.5 C25 40 33 37 32 43.5 C31 51 20 56 13 49" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M31 57 V25 L44.5 41.5 L58 25 V57" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

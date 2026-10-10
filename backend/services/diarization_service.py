@@ -1,0 +1,114 @@
+"""
+Diarization service using PyAnnote.
+
+This service handles PyAnnote pipeline loading, caching, and speaker diarization
+processing with progress tracking.
+"""
+import asyncio
+import logging
+
+import torchaudio
+from config import Settings
+from database import update_error
+from repositories.job_repository import JobRepository
+from services.gpu_models import get_diarization_pipeline
+
+logger = logging.getLogger(__name__)
+
+
+class DiarizationService:
+    """Service for speaker diarization using PyAnnote."""
+
+    def __init__(self, settings: Settings, job_repo: JobRepository):
+        """
+        Initialize DiarizationService.
+
+        Args:
+            settings: Application settings
+            job_repo: Job repository for database operations
+        """
+        self.settings = settings
+        self.job_repo = job_repo
+
+    def get_pipeline(self):
+        """
+        Get cached PyAnnote speaker diarization pipeline.
+
+        Returns:
+            PyAnnote pipeline instance
+        """
+        return get_diarization_pipeline(
+            self.settings.pyannote_model_name,
+            self.settings.hf_token,
+            self.settings.device,
+        )
+
+    async def diarize(self, job_uuid: str, file_path: str) -> dict:
+        """
+        Perform speaker diarization with progress tracking.
+
+        Args:
+            job_uuid: Job UUID
+            file_path: Path to audio file
+
+        Returns:
+            Diarization data dict with speaker segments
+
+        Raises:
+            Exception: If diarization fails
+        """
+        try:
+            await self.job_repo.update_workflow_state(job_uuid, 'diarizing', 0)
+            logger.info("Starting diarization for job %s", job_uuid)
+
+            # Get cached pipeline
+            pipeline = self.get_pipeline()
+
+            # Diarize audio - run in executor to avoid blocking event loop.
+            # torchaudio.load + pipeline are both blocking; bundle them together
+            # so neither runs on the event loop thread. Passing the waveform dict
+            # bypasses torchcodec, which fails on CUDA 12.8.
+            await self.job_repo.update_step_progress(job_uuid, 10)
+            loop = asyncio.get_event_loop()
+            def _load_and_diarize():
+                waveform, sample_rate = torchaudio.load(file_path)
+                return pipeline({"waveform": waveform, "sample_rate": sample_rate})
+            diarization = await loop.run_in_executor(None, _load_and_diarize)
+
+            await self.job_repo.update_step_progress(job_uuid, 90)
+            logger.info("Diarization complete for job %s", job_uuid)
+
+            # Convert diarization to serializable format
+            # pyannote 4.x returns a DiarizeOutput; itertracks is on the inner Annotation
+            diarization_data = {
+                "segments": []
+            }
+
+            for turn, _, speaker in diarization.speaker_diarization.itertracks(yield_label=True):
+                diarization_data["segments"].append({
+                    "start": turn.start,
+                    "end": turn.end,
+                    "speaker": speaker
+                })
+
+            # Save diarization data to database
+            await self.job_repo.save_diarization(job_uuid, diarization_data)
+
+            # Update state to diarized
+            await self.job_repo.update_step_progress(job_uuid, 100)
+            await self.job_repo.update_workflow_state(job_uuid, 'diarized', 100)
+            logger.info("Diarization step completed for job %s", job_uuid)
+
+            return diarization_data
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(
+                "Diarization failed for job %s: %s",
+                job_uuid,
+                error_msg,
+                exc_info=True
+            )
+            await update_error(job_uuid, f"Diarization failed: {error_msg}")
+            await self.job_repo.update_workflow_state(job_uuid, 'error', 0)
+            raise
