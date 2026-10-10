@@ -20,12 +20,18 @@ def _fake_settings(json_mode: bool):
         llm_model_name="fake-model",
         llm_api_key=None,
         llm_json_mode=json_mode,
+        llm_timeout=30,
     )
 
 
 class _FakeResponse:
-    def __init__(self, content: str):
+    def __init__(self, content: str, status_code: int = 200):
         self._content = content
+        self.status_code = status_code
+
+    @property
+    def is_success(self) -> bool:
+        return 200 <= self.status_code < 300
 
     def raise_for_status(self):
         return None
@@ -45,6 +51,9 @@ class _FakeClient:
     async def post(self, url, headers=None, json=None, timeout=None):
         self.last_url = url
         self.last_json = json
+        # The service tries Ollama's native chat first and falls back when it is missing.
+        if url.endswith("/api/chat"):
+            return _FakeResponse(self.content, status_code=404)
         return _FakeResponse(self.content)
 
 
