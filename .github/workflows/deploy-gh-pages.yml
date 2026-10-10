@@ -17,24 +17,48 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    outputs:
+      pages_enabled: ${{ steps.pages.outputs.enabled }}
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
+    - name: Check whether GitHub Pages is enabled
+      id: pages
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        code=$(curl -s -o /dev/null -w '%{http_code}' \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${{ github.repository }}/pages")
+        if [ "$code" = "200" ]; then
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+        elif [ "$code" = "404" ]; then
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::GitHub Pages is not enabled, so the demo site was not published. In the repository settings, open Pages and set the source to GitHub Actions."
+        else
+          echo "Unexpected response from the GitHub Pages API: HTTP ${code}"
+          exit 1
+        fi
+
     - name: Setup Node.js
+      if: steps.pages.outputs.enabled == 'true'
       uses: actions/setup-node@v4
       with:
         node-version: '24'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-        
+
     - name: Install dependencies
+      if: steps.pages.outputs.enabled == 'true'
       run: |
         cd frontend
         npm ci
-        
+
     - name: Build project
+      if: steps.pages.outputs.enabled == 'true'
       run: |
         cd frontend
         npm run build
@@ -42,14 +66,17 @@ jobs:
         VITE_DEMO_MODE: 'true'
 
     - name: Setup Pages
+      if: steps.pages.outputs.enabled == 'true'
       uses: actions/configure-pages@v4
-      
+
     - name: Upload artifact
+      if: steps.pages.outputs.enabled == 'true'
       uses: actions/upload-pages-artifact@v3
       with:
         path: ./frontend/dist
-        
+
   deploy:
+    if: needs.build.outputs.pages_enabled == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
