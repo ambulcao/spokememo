@@ -11,7 +11,7 @@ import logging
 from config import Settings
 from database import update_error
 from repositories.job_repository import JobRepository
-from services.gpu_models import get_whisper_model
+
 from services.gpu_models import get_whisper_model
 
 logger = logging.getLogger(__name__)

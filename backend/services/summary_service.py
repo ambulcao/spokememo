@@ -12,6 +12,7 @@ import aiofiles
 import httpx
 from config import Settings
 from fastapi import HTTPException
+
 from services.gpu_models import release_gpu_models
 from services.translation import (
     TARGET_LANGUAGE_NAMES,

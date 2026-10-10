@@ -12,6 +12,7 @@ import aiofiles
 from config import Settings
 from database import update_error, update_status
 from repositories.job_repository import JobRepository
+
 from services.summary_service import SummaryService
 from services.translation import normalize_target_language, same_language
 

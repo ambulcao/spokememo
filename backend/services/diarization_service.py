@@ -11,6 +11,7 @@ import torchaudio
 from config import Settings
 from database import update_error
 from repositories.job_repository import JobRepository
+
 from services.gpu_models import get_diarization_pipeline
 
 logger = logging.getLogger(__name__)

@@ -11,9 +11,9 @@ from config import Settings, get_settings
 
 from utils.formatters import (
     format_generated_on,
+    format_timestamp,
     localize_report_text,
     report_speaker_name,
-    format_timestamp,
 )
 
 
